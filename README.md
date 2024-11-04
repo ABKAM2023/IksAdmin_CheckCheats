@@ -15,10 +15,12 @@
 
 ## Фотокарточки:
 От лица подозреваемого:
-- ![image](https://github.com/user-attachments/assets/3206eb55-d98e-43a4-8534-2ed542ff226a)
+
+![image](https://github.com/user-attachments/assets/3206eb55-d98e-43a4-8534-2ed542ff226a)
 
 От лица администратора:
-- ![image](https://github.com/user-attachments/assets/047ef07d-2808-4fbf-b5c7-0c2038369859)
+
+![image](https://github.com/user-attachments/assets/047ef07d-2808-4fbf-b5c7-0c2038369859)
 
 ## Конфигурационный файл
 ```json
