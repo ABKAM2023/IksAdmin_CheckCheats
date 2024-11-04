@@ -74,11 +74,8 @@
     "html_success_message": "<font color='green' class='fontSize-m+'>Вы успешно прошли проверку.</font>",
 
     "discord_check_started_title": "🔍 Проверка начата",
-    "discord_check_started_color": "0xffa500",
     "discord_contact_provided_title": "📱 Дискорд предоставлен",
-    "discord_contact_provided_color": "0x00ff00",
-    "discord_check_completed_title": "✅ Проверка завершена",
-    "discord_check_completed_color": "0x00ff00",    
+    "discord_check_completed_title": "✅ Проверка завершена", 
 
     "discord_check_started_description": "Игрок был вызван на проверку.",
     "discord_check_completed_description": "Проверка игрока успешно завершена.",
@@ -89,6 +86,5 @@
     "discord_contact_field": "Дискорд",
 
     "discord_system_footer_text": "Система проверки",
-    "discord_system_footer_icon_url": "https://i.imgur.com/2NbqQu7.png"
 }
 ```
