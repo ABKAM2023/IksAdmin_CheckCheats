@@ -67,7 +67,7 @@
     "error_message": "Пожалуйста, укажите ваш дискорд. Используйте: {Green}!contact ваш_дискорд",    
     "error_no_active_check": "У вас нет активной проверки.",
 
-    "message_closed": "Ваши активные проверки успешно закрыты.",
+    "message_closed": "Сообщение с проверкой скрыто.",
 
     "html_countdown_message_format": "<font color='white' class='fontSize-m+'>Вы были вызваны на проверку. Оставшееся время: <font color='red'>{0} сек.</font> Отправьте свой <font color='#5865F2'>Discord</font> через команду: <font color='yellow'>!contact ваш_дискорд</font></font>",
     "html_admin_check_info_message": "<font color='white' class='fontSize-m'>Проверка игрока:</font><br><font color='red' class='fontSize-m'>{0}</font><br><font color='white' class='fontSize-m'>Оставшееся время: <font color='yellow' class='fontSize-l'>{1} сек.</font></font><br><font color='gray' class='fontSize-s'>Для скрытия сообщения напишите !close</font>",
