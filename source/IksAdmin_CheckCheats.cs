@@ -23,7 +23,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 {
     public override string ModuleName => "[IksAdmin] Check Cheats";
     public override string ModuleAuthor => "ABKAM";
-    public override string ModuleVersion => "1.1.0";   
+    public override string ModuleVersion => "1.1.1";   
     
     public static PluginCapability<IIksAdminApi> AdminApiCapability = new("iksadmin:core");
     private readonly PluginCapability<IMenuApi?> _menuCapability = new("menu:nfcore");
@@ -262,8 +262,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 
         checkMenu.Open(admin);
     }
-
-
+    
     private void ShowUncheckMenu(CCSPlayerController admin)
     {
         if (_menuApi == null || _api == null) return;
@@ -308,8 +307,8 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
             return;
         }
 
-        StopCheck(playerSteamId64);
         StopCheckTimer(playerSteamId64);
+        CleanupAfterProcessing(playerSteamId64);
 
         admin.PrintToChat(_chatPrefix + Localizer["uncheck", player.PlayerName]);
 
@@ -341,7 +340,6 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         }
 
         _ = LogCheckEndToDatabase(playerSteamId64.ToString(), "db_check_result_completed", discordContact);
-        _adminCheckMessages.Remove(playerSteamId64);
         _uncheckMessages[playerSteamId64] = 100;
     }
 
@@ -532,8 +530,13 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         _adminCheckMessages.Remove(playerSteamId64);
         _playersUnderCheck.Remove(playerSteamId64);
         _processedPlayers.Remove(playerSteamId64);
-        StopCheckTimer(playerSteamId64);
+        _contactProvided.Remove(playerSteamId64);
+        _hiddenMessagesForAdmins.Remove(playerSteamId64);
+        _messageDisplayTimes.Remove(playerSteamId64);
+        _uncheckMessages.Remove(playerSteamId64);
+        StopCheckTimer(playerSteamId64, true); 
     }
+
 
     [GameEventHandler(HookMode.Pre)]
     public HookResult OnPlayerTeamPre(EventPlayerTeam @event, GameEventInfo info)
