@@ -23,7 +23,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 {
     public override string ModuleName => "[IksAdmin] Check Cheats";
     public override string ModuleAuthor => "ABKAM";
-    public override string ModuleVersion => "1.1.1";   
+    public override string ModuleVersion => "1.2.0";   
     
     public static PluginCapability<IIksAdminApi> AdminApiCapability = new("iksadmin:core");
     private readonly PluginCapability<IMenuApi?> _menuCapability = new("menu:nfcore");
@@ -32,6 +32,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
     
     private static readonly HttpClient HttpClient = new();
     private readonly Dictionary<ulong, AdminCheckInfo> _adminCheckMessages = new();
+    private readonly Dictionary<ulong, CParticleSystem> _activeOverlays = new();
     private readonly HashSet<ulong> _contactProvided = new();
     private readonly HashSet<ulong> _hiddenMessagesForAdmins = new();
     private readonly Dictionary<ulong, int> _messageDisplayTimes = new();
@@ -90,10 +91,12 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 
         RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
         RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
+        RegisterEventHandler<EventRoundStart>(OnRoundStart);
         RegisterListener<Listeners.OnTick>(OnTick);
 
         RegisterListener<Listeners.OnMapStart>(OnMapStart);
         RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
+        RegisterListener<Listeners.CheckTransmit>(CheckTransmit);
 
         AddCommand("css_contact", Localizer["command_contact_description"], PlayerContactCommand);
         AddCommand("css_close", Localizer["command_close_description"], CloseMessageCommand);
@@ -103,6 +106,20 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         InitializeDatabase();
     }
 
+    public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+    {
+        foreach (var playerSteamId64 in _playersUnderCheck)
+        {
+            var player = Utilities.GetPlayers().Find(p => p.AuthorizedSteamID != null && p.AuthorizedSteamID.SteamId64 == playerSteamId64);
+            if (player != null && player.IsValid)
+            {
+                ApplyCheatCheckParticle(player); 
+            }
+        }
+        return HookResult.Continue;
+    }
+
+    
     public HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
     {
         var player = @event.Userid;
@@ -128,8 +145,14 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
     {
         _isMapChanging = true;
         _lastMapChangeTime = DateTime.UtcNow;
+        
+        RegisterListener<Listeners.OnServerPrecacheResources>(PreCacheResources);
+        
     }
-
+    private void PreCacheResources(ResourceManifest manifest)
+    {
+        manifest.AddResource(Config.OverlayPath);
+    }
     public void OnMapEnd()
     {
         _isMapChanging = false;
@@ -307,6 +330,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
             return;
         }
 
+        RemoveOverlay(playerSteamId64); 
         StopCheckTimer(playerSteamId64);
         CleanupAfterProcessing(playerSteamId64);
 
@@ -407,6 +431,8 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         }
 
         if (removeFromRemainingTimes) _remainingTimes.Remove(playerSteamId64);
+        
+        RemoveOverlay(playerSteamId64);
     }
     
     private void OnTick()
@@ -435,7 +461,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
             {
                 var player = Utilities.GetPlayers().Find(p =>
                     p.AuthorizedSteamID != null && p.AuthorizedSteamID.SteamId64 == playerSteamId64);
-                if (player != null) player.PrintToCenterHtml(Localizer["uncheck_message"]);
+                if (player != null) player.PrintToCenterHtml(Localizer["html_success_message"]);
                 _uncheckMessages[playerSteamId64]--;
             }
             else
@@ -443,20 +469,24 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
                 _uncheckMessages.Remove(playerSteamId64);
             }
         }
-
-        foreach (var kvp in _remainingTimes)
+        
+        if (Config.ShowHtmlMessageSuspect)
         {
-            var playerSteamId64 = kvp.Key;
-            var timeLeft = kvp.Value;
-
-            if (timeLeft > 0)
+            foreach (var kvp in _remainingTimes)
             {
-                string updatedMessage = Localizer["html_countdown_message_format", timeLeft];
-                var player = Utilities.GetPlayers().Find(p =>
-                    p.AuthorizedSteamID != null && p.AuthorizedSteamID.SteamId64 == playerSteamId64);
-                if (player != null) player.PrintToCenterHtml(updatedMessage);
+                var playerSteamId64 = kvp.Key;
+                var timeLeft = kvp.Value;
+
+                if (timeLeft > 0)
+                {
+                    string updatedMessage = Localizer["html_countdown_message_format", timeLeft];
+                    var player = Utilities.GetPlayers().Find(p =>
+                        p.AuthorizedSteamID != null && p.AuthorizedSteamID.SteamId64 == playerSteamId64);
+                    if (player != null) player.PrintToCenterHtml(updatedMessage);
+                }
             }
         }
+
 
         foreach (var kvp in new Dictionary<ulong, int>(_messageDisplayTimes))
         {
@@ -535,6 +565,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         _messageDisplayTimes.Remove(playerSteamId64);
         _uncheckMessages.Remove(playerSteamId64);
         StopCheckTimer(playerSteamId64, true); 
+        RemoveOverlay(playerSteamId64); 
     }
 
 
@@ -579,11 +610,16 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 
         if (Config.MoveToSpectatorsOnCheck)
             Server.NextFrame(() => { playerToCheck.ChangeTeam(CsTeam.Spectator); });
+        
+        playerToCheck.PrintToCenterHtml(_chatPrefix + Localizer["check_start_message"]);
+        
+        if (Config.Overlay)
+        {
+            ApplyCheatCheckParticle(playerToCheck);
+        }
 
-        playerToCheck.ExecuteClientCommand($"play {Config.CheckSoundPath}");
-        playerToCheck.PrintToChat(_chatPrefix + Localizer["check_start_message"]);
-
-        if (Config.EnableDiscordLogging && !string.IsNullOrEmpty(Config.DiscordWebhookUrl) && Config.WebhookMode == 1)
+        if (Config.EnableDiscordLogging && !string.IsNullOrEmpty(Config.DiscordWebhookUrl))
+        {
             _ = SendDiscordCheckStartedNotification(
                 Config.DiscordWebhookUrl,
                 playerToCheck.PlayerName,
@@ -591,14 +627,55 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
                 playerSteamId64.ToString(),
                 adminSteamId64.ToString()
             );
+        }
     }
-
-
-    private void StopCheck(ulong playerSteamId64)
+    private void CheckTransmit(CCheckTransmitInfoList infoList)
     {
-        if (_playersUnderCheck.Contains(playerSteamId64)) _playersUnderCheck.Remove(playerSteamId64);
-    }
+        foreach (var (info, player) in infoList)
+        {
+            if (player == null || player.AuthorizedSteamID == null) continue;
 
+            foreach (var (OverlaySteamID, particleSystem) in _activeOverlays)
+            {
+                var OverlayOwner = Utilities.GetPlayerFromSteamId(OverlaySteamID);
+                if (OverlayOwner == null || !particleSystem.IsValid) continue;
+                
+                uint OverlayEntityIndex = particleSystem.Index;
+                if (OverlayEntityIndex == Utilities.InvalidEHandleIndex) continue;
+                
+                if (player.AuthorizedSteamID.SteamId64 != OverlaySteamID)
+                {
+                    info.TransmitEntities.Remove((int)OverlayEntityIndex);
+                }
+            }
+        }
+    }
+    
+    private void ApplyCheatCheckParticle(CCSPlayerController player)
+    {
+        var particleSystem = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
+        if (particleSystem == null || !particleSystem.IsValid) return;
+
+        particleSystem.EffectName = Config.OverlayPath;
+        var origin = player.PlayerPawn?.Value?.AbsOrigin ?? new Vector();
+        particleSystem.Teleport(origin, new QAngle(), new Vector());
+        particleSystem.DispatchSpawn();
+        particleSystem.AcceptInput("FollowEntity", player.PlayerPawn?.Value, player.PlayerPawn?.Value, "!activator", 0);
+        particleSystem.AcceptInput("Start");
+
+        _activeOverlays[player.AuthorizedSteamID!.SteamId64] = particleSystem;
+    }
+    
+    private void RemoveOverlay(ulong playerSteamId64)
+    {
+        if (_activeOverlays.TryGetValue(playerSteamId64, out var particleSystem) && particleSystem.IsValid)
+        {
+            particleSystem.Active = false;
+            particleSystem.DispatchSpawn();
+            _activeOverlays.Remove(playerSteamId64);
+        }
+    }
+    
     private async Task SendConsolidatedDiscordNotification(string webhookUrl, string playerName, string adminName,
         string playerSteamId64, string adminSteamId64, string discordContact, string checkResult)
     {

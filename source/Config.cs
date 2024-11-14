@@ -14,7 +14,9 @@ public class IksAdminCheckCheatsConfig : BasePluginConfig
     [JsonPropertyName("flag")] public string Flag { get; set; } = "c";
 
     [JsonPropertyName("check_sound_path")] public string CheckSoundPath { get; set; } = "sounds/buttons/button8.vsnd_c";
-
+    [JsonPropertyName("overlay")] public bool Overlay { get; set; } = false;
+    [JsonPropertyName("overlay_path")] public string OverlayPath { get; set; } = "particles/cheats_check.vpcf";
+    [JsonPropertyName("show_html_message_suspect")] public bool ShowHtmlMessageSuspect { get; set; } = true;    
     [JsonPropertyName("ban_on_disconnect_after_contact")]
     public bool BanOnDisconnectAfterContact { get; set; } = true;
 
