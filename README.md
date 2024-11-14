@@ -35,6 +35,10 @@
   "move_to_spectators_on_check": true,
   "block_team_change_during_check": true,
 
+  "overlay": false,
+  "overlay_path": "particles/cheats_check.vpcf",
+  "show_html_message_suspect": true,
+  
   "enable_discord_logging": false,
   "webhook_mode": 1,
   "discord_webhook_url": "",
@@ -42,7 +46,7 @@
   "discord_color_contact_provided": "00FF00",
   "discord_color_check_completed": "00FF00",
   "discord_footer_icon_url": "https://i.imgur.com/2NbqQu7.png",
-  
+
   "enable_database_logging": false,  
   "server_id": 1,
   "database_host": "localhost",
