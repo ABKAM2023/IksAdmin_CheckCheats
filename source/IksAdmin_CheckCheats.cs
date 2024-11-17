@@ -23,7 +23,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 {
     public override string ModuleName => "[IksAdmin] Check Cheats";
     public override string ModuleAuthor => "ABKAM";
-    public override string ModuleVersion => "1.2.0";   
+    public override string ModuleVersion => "1.2.1";   
     
     public static PluginCapability<IIksAdminApi> AdminApiCapability = new("iksadmin:core");
     private readonly PluginCapability<IMenuApi?> _menuCapability = new("menu:nfcore");
@@ -41,6 +41,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
     private readonly HashSet<ulong> _processedPlayers = new();
     private readonly Dictionary<ulong, int> _remainingTimes = new();
     private readonly Dictionary<ulong, int> _uncheckMessages = new();
+    private readonly HashSet<ulong> _playersChangingTeam = new();
     private readonly Dictionary<ulong, (string DiscordContact, ulong AdminSteamId)> _webhookInfo = new();
     
     private MySqlConnection? _dbConnection;
@@ -366,7 +367,6 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         _ = LogCheckEndToDatabase(playerSteamId64.ToString(), "db_check_result_completed", discordContact);
         _uncheckMessages[playerSteamId64] = 100;
     }
-
     private void StartCheckTimer(CCSPlayerController playerToCheck, CCSPlayerController admin, int remainingTime)
     {
         if (playerToCheck?.AuthorizedSteamID == null || admin?.AuthorizedSteamID == null)
@@ -407,7 +407,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 
                 if (_remainingTimes[playerSteamId64] <= 0)
                 {
-                    BanPlayerOffline(playerSteamId64);
+                    BanPlayerOffline(playerSteamId64, admin); 
                     StopCheckTimer(playerSteamId64);
                 }
                 else
@@ -421,6 +421,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
             }
         }, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
     }
+
     
     private void StopCheckTimer(ulong playerSteamId64, bool removeFromRemainingTimes = false)
     {
@@ -431,8 +432,6 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         }
 
         if (removeFromRemainingTimes) _remainingTimes.Remove(playerSteamId64);
-        
-        RemoveOverlay(playerSteamId64);
     }
     
     private void OnTick()
@@ -519,23 +518,48 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 
         if (recentlyMapChanged) return HookResult.Continue;
 
-        if (_playersUnderCheck.Contains(playerSteamId64)) ScheduleBanForDisconnectedPlayer(playerSteamId64);
+        if (_playersUnderCheck.Contains(playerSteamId64))
+        {
+            if (_adminCheckMessages.TryGetValue(playerSteamId64, out var adminCheckInfo))
+            {
+                var admin = Utilities.GetPlayers().Find(p =>
+                    p.AuthorizedSteamID != null && p.AuthorizedSteamID.SteamId64 == adminCheckInfo.AdminSteamId);
+
+                if (admin != null && admin.IsValid)
+                {
+                    ScheduleBanForDisconnectedPlayer(playerSteamId64, admin);
+                }
+                else
+                {
+                    Logger.LogWarning($"No valid admin found to ban player {player.PlayerName} (SteamID64: {playerSteamId64}).");
+                }
+            }
+            else
+            {
+                Logger.LogWarning($"No admin check info found for player {player.PlayerName} (SteamID64: {playerSteamId64}).");
+            }
+        }
 
         return HookResult.Continue;
     }
 
-    private void ScheduleBanForDisconnectedPlayer(ulong playerSteamId64)
+
+    private void ScheduleBanForDisconnectedPlayer(ulong playerSteamId64, CCSPlayerController admin)
     {
         StopCheckTimer(playerSteamId64);
         new Timer(1.0f, () =>
         {
             if (_isMapChanging && (DateTime.UtcNow - _lastMapChangeTime).TotalSeconds <= 5) return;
 
-            if (!_processedPlayers.Contains(playerSteamId64)) BanPlayerOffline(playerSteamId64);
+            if (!_processedPlayers.Contains(playerSteamId64)) 
+            {
+                BanPlayerOffline(playerSteamId64, admin); 
+            }
         });
     }
 
-    private async void BanPlayerOffline(ulong playerSteamId64)
+
+    private async void BanPlayerOffline(ulong playerSteamId64, CCSPlayerController admin)
     {
         if (!_webhookInfo.TryGetValue(playerSteamId64, out var webhookData))
             Logger.LogWarning($"Player {playerSteamId64} has no recorded webhook data for ban logging.");
@@ -548,12 +572,18 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
 
         CleanupAfterProcessing(playerSteamId64);
 
+        if (admin == null || !admin.IsValid)
+        {
+            Logger.LogError($"Admin context is invalid for banning player {playerSteamId64}.");
+            return;
+        }
+
         Server.NextFrame(() =>
         {
-            Server.ExecuteCommand($"css_ban #{playerSteamId64} {Config.BanTime} \"{Config.BanReason}\"");
+            admin.ExecuteClientCommandFromServer($"css_ban #{playerSteamId64} {Config.BanTime} \"{Config.BanReason}\"");
         });
     }
-
+    
     private void CleanupAfterProcessing(ulong playerSteamId64)
     {
         _webhookInfo.Remove(playerSteamId64);
@@ -567,8 +597,7 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         StopCheckTimer(playerSteamId64, true); 
         RemoveOverlay(playerSteamId64); 
     }
-
-
+    
     [GameEventHandler(HookMode.Pre)]
     public HookResult OnPlayerTeamPre(EventPlayerTeam @event, GameEventInfo info)
     {
@@ -595,40 +624,70 @@ public class IksAdminCheckCheatsPlugin : BasePlugin, IPluginConfig<IksAdminCheck
         return HookResult.Continue;
     }
 
-    private void StartCheck(CCSPlayerController playerToCheck, CCSPlayerController admin)
+
+private void StartCheck(CCSPlayerController playerToCheck, CCSPlayerController admin)
+{
+    var playerSteamId64 = playerToCheck.AuthorizedSteamID!.SteamId64;
+    var adminSteamId64 = admin.AuthorizedSteamID!.SteamId64;
+
+    if (_playersUnderCheck.Contains(playerSteamId64))
     {
-        var playerSteamId64 = playerToCheck.AuthorizedSteamID!.SteamId64;
-        var adminSteamId64 = admin.AuthorizedSteamID!.SteamId64;
-        _playersUnderCheck.Add(playerSteamId64);
+        admin.PrintToChat(_chatPrefix + Localizer["error_already_under_check", playerToCheck.PlayerName]);
+        return;
+    }
 
-        var suspectDiscord = _webhookInfo.TryGetValue(playerSteamId64, out var webhookData)
-            ? webhookData.DiscordContact
-            : null;
+    _playersUnderCheck.Add(playerSteamId64);
 
-        _ = LogCheckStartToDatabase(Config.ServerId, playerSteamId64.ToString(), playerToCheck.PlayerName,
-            adminSteamId64.ToString(), admin.PlayerName, suspectDiscord);
+    var suspectDiscord = _webhookInfo.TryGetValue(playerSteamId64, out var webhookData)
+        ? webhookData.DiscordContact
+        : null;
 
-        if (Config.MoveToSpectatorsOnCheck)
-            Server.NextFrame(() => { playerToCheck.ChangeTeam(CsTeam.Spectator); });
-        
-        playerToCheck.PrintToCenterHtml(_chatPrefix + Localizer["check_start_message"]);
-        
-        if (Config.Overlay)
+    _ = LogCheckStartToDatabase(Config.ServerId, playerSteamId64.ToString(), playerToCheck.PlayerName,
+        adminSteamId64.ToString(), admin.PlayerName, suspectDiscord);
+    
+    if (Config.MoveToSpectatorsOnCheck && playerToCheck.Team != CsTeam.Spectator)
+    {
+        if (!_playersChangingTeam.Contains(playerSteamId64))
         {
-            ApplyCheatCheckParticle(playerToCheck);
+            try
+            {
+                _playersChangingTeam.Add(playerSteamId64); 
+                playerToCheck.ChangeTeam(CsTeam.Spectator);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error while changing team for player {playerToCheck.PlayerName}: {ex.Message}");
+            }
+            finally
+            {
+                _playersChangingTeam.Remove(playerSteamId64);
+            }
         }
-
-        if (Config.EnableDiscordLogging && !string.IsNullOrEmpty(Config.DiscordWebhookUrl))
+        else
         {
-            _ = SendDiscordCheckStartedNotification(
-                Config.DiscordWebhookUrl,
-                playerToCheck.PlayerName,
-                admin.PlayerName,
-                playerSteamId64.ToString(),
-                adminSteamId64.ToString()
-            );
+            Logger.LogWarning($"Attempted to change team for player {playerToCheck.PlayerName} while already processing.");
         }
     }
+
+    playerToCheck.PrintToCenterHtml(_chatPrefix + Localizer["check_start_message"]);
+
+    if (Config.Overlay)
+    {
+        ApplyCheatCheckParticle(playerToCheck);
+    }
+
+    if (Config.EnableDiscordLogging && !string.IsNullOrEmpty(Config.DiscordWebhookUrl))
+    {
+        _ = SendDiscordCheckStartedNotification(
+            Config.DiscordWebhookUrl,
+            playerToCheck.PlayerName,
+            admin.PlayerName,
+            playerSteamId64.ToString(),
+            adminSteamId64.ToString()
+        );
+    }
+}
+
     private void CheckTransmit(CCheckTransmitInfoList infoList)
     {
         foreach (var (info, player) in infoList)
