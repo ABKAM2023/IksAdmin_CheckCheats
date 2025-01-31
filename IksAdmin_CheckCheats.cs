@@ -90,7 +90,7 @@ public class IksAdminCheckCheatsPlugin : AdminModule, IPluginConfig<IksAdminChec
         menu.AddMenuOption("select_player_for_check", Localizer["select_player_for_check"], (p, _) => {
             ShowCheckMenu(p);
         }, viewFlags: AdminUtils.GetCurrentPermissionFlags("check_cheats.flag"));
-        menu.AddMenuOption("select_player_for_check", Localizer["select_player_for_check"], (p, _) => {
+        menu.AddMenuOption("select_player_to_uncheck", Localizer["select_player_to_uncheck"], (p, _) => {
             ShowUncheckMenu(p);
         }, viewFlags: AdminUtils.GetCurrentPermissionFlags("check_cheats.flag"));
 
@@ -621,7 +621,7 @@ public class IksAdminCheckCheatsPlugin : AdminModule, IPluginConfig<IksAdminChec
                 if (player != null && player.IsValid)
                 {
                     Logger.LogInformation($"Banning player {playerSteamId64}.");
-                    admin.ExecuteClientCommandFromServer($"css_ban #{playerSteamId64} {Config.BanTime} \"{Config.BanReason}\"");
+                    admin.ExecuteClientCommandFromServer($"css_addban {playerSteamId64} {Config.BanTime} \"{Config.BanReason}\"");
                 }
                 else
                 {

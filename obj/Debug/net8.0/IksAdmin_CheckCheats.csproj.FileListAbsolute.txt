@@ -1,0 +1,16 @@
+E:\__iksAdmin\IksAdmin_CheckCheats\bin\Debug\net8.0\IksAdmin_CheckCheats.deps.json
+E:\__iksAdmin\IksAdmin_CheckCheats\bin\Debug\net8.0\IksAdmin_CheckCheats.dll
+E:\__iksAdmin\IksAdmin_CheckCheats\bin\Debug\net8.0\IksAdmin_CheckCheats.pdb
+E:\__iksAdmin\IksAdmin_CheckCheats\bin\Debug\net8.0\IksAdminApi.dll
+E:\__iksAdmin\IksAdmin_CheckCheats\bin\Debug\net8.0\IksAdminApi.pdb
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.csproj.AssemblyReference.cache
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.GeneratedMSBuildEditorConfig.editorconfig
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.AssemblyInfoInputs.cache
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.AssemblyInfo.cs
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.csproj.CoreCompileInputs.cache
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.sourcelink.json
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin.10DEEEF0.Up2Date
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.dll
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\refint\IksAdmin_CheckCheats.dll
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\IksAdmin_CheckCheats.pdb
+E:\__iksAdmin\IksAdmin_CheckCheats\obj\Debug\net8.0\ref\IksAdmin_CheckCheats.dll
