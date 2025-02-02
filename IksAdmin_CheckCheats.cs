@@ -432,7 +432,10 @@ public class IksAdminCheckCheatsPlugin : AdminModule, IPluginConfig<IksAdminChec
                     if (!_webhookInfo.TryGetValue(playerSteamId64, out var webhookData) || string.IsNullOrEmpty(webhookData.DiscordContact))
                     {
                         Logger.LogInformation($"Player {playerSteamId64} did not provide Discord contact. Banning...");
-                        BanPlayerOffline(playerSteamId64, admin);
+                        var steamId = admin.GetSteamId();
+                        Task.Run(async () => {
+                            await BanPlayerOffline(playerSteamId64, steamId);
+                        });
                     }
                     else
                     {
@@ -584,12 +587,15 @@ public class IksAdminCheckCheatsPlugin : AdminModule, IPluginConfig<IksAdminChec
 
             if (!_processedPlayers.Contains(playerSteamId64))
             {
-                BanPlayerOffline(playerSteamId64, admin);
+                var steamId = admin.GetSteamId();
+                Task.Run(async () => {
+                    await BanPlayerOffline(playerSteamId64, steamId);
+                });
             }
         });
     }
 
-    private async void BanPlayerOffline(ulong playerSteamId64, CCSPlayerController admin)
+    private async Task BanPlayerOffline(ulong playerSteamId64, string adminSteamId64)
     {
         try
         {
@@ -607,31 +613,26 @@ public class IksAdminCheckCheatsPlugin : AdminModule, IPluginConfig<IksAdminChec
 
             CleanupAfterProcessing(playerSteamId64);
 
-            if (admin == null || !admin.IsValid)
-            {
-                Logger.LogError($"Admin context is invalid for banning player {playerSteamId64}.");
-                return;
-            }
+  
 
             Server.NextFrame(() =>
             {
+                var admin = PlayersUtils.GetControllerBySteamId(adminSteamId64);
+                if (admin == null || !admin.IsValid)
+                {
+                    Logger.LogError($"Admin context is invalid for banning player {playerSteamId64}.");
+                    return;
+                }
                 var player = Utilities.GetPlayers().FirstOrDefault(p =>
                     p.AuthorizedSteamID?.SteamId64 == playerSteamId64 && p.IsValid);
 
-                if (player != null && player.IsValid)
-                {
-                    Logger.LogInformation($"Banning player {playerSteamId64}.");
-                    admin.ExecuteClientCommandFromServer($"css_addban {playerSteamId64} {Config.BanTime} \"{Config.BanReason}\"");
-                }
-                else
-                {
-                    Logger.LogWarning($"Player {playerSteamId64} is not valid or not found for ban.");
-                }
+                Logger.LogInformation($"Banning player {playerSteamId64}.");
+                admin.ExecuteClientCommandFromServer($"css_addban {playerSteamId64} {Config.BanTime} \"{Config.BanReason}\"");
             });
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error in BanPlayerOffline: {ex.Message}");
+            Logger.LogError($"Error in BanPlayerOffline: {ex.ToString()}");
         }
     }
 
